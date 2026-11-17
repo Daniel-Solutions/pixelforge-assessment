@@ -50,3 +50,17 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **An idempotent replay is a success.** `Idempotent-Replayed: true` returns the generation as it is now, possibly already finished; its state goes through `ApplyGenerationState` like any webhook.
 
 **A generation we gave up on, but Pixelforge finished.** If every attempt timed out, we fail it locally. If one attempt had actually reached Pixelforge, its webhook (found by `metadata.generation_uuid`) later says `succeeded` and Pixelforge bills it. We then store the provider cost and tokens on the failed row (so `/v1/usage` still reconciles) but never charge the user and never change the status: `StateChange::BilledAfterLocalFailure`, logged as a warning. Rejected: flipping it to succeeded (a final status would move) or ignoring it (our provider cost would silently drift from Pixelforge's).
+
+## Webhooks
+
+**Signature first, on the raw bytes.** `VerifyPixelforgeSignature` parses `t=<unix>,v1=<hex>` (several `v1` values are accepted, for secret rotation), recomputes HMAC-SHA256 of `"{t}.{raw body}"` with `hash_equals`, and rejects with 400 if the header is missing, malformed, wrong, or `|now − t| > 300 s`. It uses `$request->getContent()`, and the controller parses those same bytes. The docs give 300 s only in their example code; we use it. With no secret configured, every webhook is rejected and a critical log is written.
+
+**Route outside the web group.** `routes/webhooks.php` is loaded through `withRouting(then:)` with no middleware group: no session, no CSRF, no auth. The signature is the authentication.
+
+**Synchronous processing, one transaction.** The event row (`insertOrIgnore` on a unique `event_id`) and its effect commit together. A redelivery inserts nothing and returns 200 `duplicate`. If applying throws, the event row rolls back too, we answer 500, and Pixelforge's own retry tries again. The work is a few indexed queries, far below the 10 s limit, so a queued job would only add a second place where things can fail. Rejected: acknowledging first and processing in a job (needs its own dedupe and retry story).
+
+**One state machine for webhooks, the send job and reconciliation.** `ApplyGenerationState` locks the row (`lockForUpdate`) and only moves the status forward (queued 0 < processing 1 < succeeded/failed 2); same or lower rank is `stale` and changes nothing. The payload is the full generation object, so `succeeded` applies even if `processing` was never seen. Results are logged and stored on the event: `applied`, `stale`, `duplicate`, `unknown`, `ignored`, `billed_after_local_failure`.
+
+**Charge exactly once, two layers.** (1) Only the transition from a non-final status into `succeeded` writes a `generation_charge` ledger entry, under the row lock. (2) `ledger_entries` has a unique `(generation_id, type)` index, so a second charge cannot be stored even if (1) had a bug. Cost is computed from the payload's `usage` and `rates`. A failure stores zero cost and no ledger entry.
+
+**Matching.** By `pixelforge_id`, else by `metadata.generation_uuid` (the webhook can beat the POST response; we then store the `pixelforge_id` right there). An event whose `metadata.app_env` is not ours, or that matches no row, is stored and answered 200 with no effect: each environment has its own key and URL, but a misconfigured URL must not touch another environment's data.

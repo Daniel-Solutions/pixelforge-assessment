@@ -75,3 +75,30 @@ function pixelforgeError(string $code, string $message = 'Something happened.'):
 {
     return ['error' => ['type' => 'api_error', 'code' => $code, 'message' => $message]];
 }
+
+/**
+ * A Pixelforge webhook event wrapping a generation object.
+ *
+ * @param  array<string, mixed>  $generation
+ * @return array<string, mixed>
+ */
+function pixelforgeEvent(string $type, array $generation, ?string $eventId = null): array
+{
+    return [
+        'id' => $eventId ?? 'evt_'.bin2hex(random_bytes(8)),
+        'object' => 'event',
+        'type' => $type,
+        'created_at' => '2026-11-04T14:03:29Z',
+        'data' => ['object' => $generation],
+    ];
+}
+
+/**
+ * The Pixelforge-Signature header for a raw body, computed like Pixelforge does.
+ */
+function pixelforgeSignature(string $body, ?int $timestamp = null, string $secret = 'whsec_test_secret'): string
+{
+    $timestamp ??= time();
+
+    return "t={$timestamp},v1=".hash_hmac('sha256', "{$timestamp}.{$body}", $secret);
+}

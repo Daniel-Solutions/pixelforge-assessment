@@ -21,6 +21,9 @@ enum StateChange: string
     /** Not one of our generations (another environment, or no matching row). */
     case Unknown = 'unknown';
 
+    /** Nothing to apply: a ping, or an event type we do not act on. */
+    case Ignored = 'ignored';
+
     /** The same event id was already processed. */
     case Duplicate = 'duplicate';
 }
