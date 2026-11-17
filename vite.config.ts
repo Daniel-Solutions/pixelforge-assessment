@@ -12,9 +12,9 @@ export default defineConfig({
             input: ['resources/css/app.css', 'resources/js/app.ts'],
             refresh: true,
             fonts: [
-                bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
-                }),
+                bunny('Inter', { weights: [400, 500, 600, 700] }),
+                bunny('Bricolage Grotesque', { weights: [700, 800] }),
+                bunny('Roboto Mono', { weights: [400, 500] }),
             ],
         }),
         inertia(),
@@ -68,6 +68,12 @@ export default defineConfig({
         htmlWhitespaceSensitivity: 'css',
         ignorePatterns: [
             '.github/**',
+            '.claude/**',
+            '.mcp.json',
+            'AGENTS.md',
+            'CLAUDE.md',
+            'boost.json',
+            'docs/design/reference/**',
             'composer.json',
             'resources/js/components/ui/*',
             'resources/views/mail/*',
