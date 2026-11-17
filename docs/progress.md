@@ -1,4 +1,4 @@
 # Progress
 
-- Current step: 2 (money: `Nanodollars`, cost and estimate, tests).
-- Done: 1 (scaffold, tooling, CI, design capture and tokens).
+- Current step: 3 (`PixelforgeClient`, DTOs, exceptions, tested with `Http::fake()`).
+- Done: 1 (scaffold, tooling, CI, design tokens), 2 (money and estimate, backend and frontend).
