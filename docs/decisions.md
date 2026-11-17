@@ -64,3 +64,9 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Charge exactly once, two layers.** (1) Only the transition from a non-final status into `succeeded` writes a `generation_charge` ledger entry, under the row lock. (2) `ledger_entries` has a unique `(generation_id, type)` index, so a second charge cannot be stored even if (1) had a bug. Cost is computed from the payload's `usage` and `rates`. A failure stores zero cost and no ledger entry.
 
 **Matching.** By `pixelforge_id`, else by `metadata.generation_uuid` (the webhook can beat the POST response; we then store the `pixelforge_id` right there). An event whose `metadata.app_env` is not ours, or that matches no row, is stored and answered 200 with no effect: each environment has its own key and URL, but a misconfigured URL must not touch another environment's data.
+
+## Reconciliation
+
+**Poll what webhooks missed, every minute.** `ReconcilePendingGenerations` (scheduled `everyMinute`, `ShouldBeUnique`) picks generations Pixelforge accepted that are still `queued`/`processing` more than 2 minutes after creation (normal runs take 5-30 s, `[slow]` up to 90 s), oldest first, at most 20 per run, and passes `GET /v1/generations/{id}` to `ApplyGenerationState`. A rate limit or a bad key stops the run; other errors skip that generation. Generations without a `pixelforge_id` are not polled: the send job owns them until it succeeds or fails them.
+
+**The billing day is the UTC day of `completed_at`.** That is how `/v1/usage` buckets cost. `pixelforge:reconcile-usage --from= --to=` sums `provider_cost`, count and tokens with `SUM` over bigints grouped by `DATE(completed_at)` for every generation with a provider cost (succeeded ones, plus the rare billed-after-local-failure), and compares them with `/v1/usage` day by day. It exits non-zero on any difference. The MySQL connection uses `timezone +00:00` so `DATE()` is a UTC day.

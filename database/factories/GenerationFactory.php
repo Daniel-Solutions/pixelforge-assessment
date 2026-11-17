@@ -42,10 +42,10 @@ class GenerationFactory extends Factory
     /**
      * Accepted by Pixelforge: it has an id and the rates fixed at creation.
      */
-    public function sent(string $pixelforgeId = 'gen_01JC2Z8Q4N6V0M3H7X5T9R2B1K'): static
+    public function sent(): static
     {
         return $this->state(fn (): array => [
-            'pixelforge_id' => $pixelforgeId,
+            'pixelforge_id' => 'gen_'.Str::upper(Str::random(26)),
             'submit_attempts' => 1,
             'rates' => ['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'],
             'provider_created_at' => now(),
