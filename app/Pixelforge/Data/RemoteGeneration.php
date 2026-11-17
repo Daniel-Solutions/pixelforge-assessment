@@ -10,7 +10,7 @@ use Carbon\CarbonImmutable;
 /**
  * The generation object as Pixelforge returns it (in API responses and in webhook payloads).
  */
-final readonly class Generation
+final readonly class RemoteGeneration
 {
     /**
      * @param  array<string, string>  $metadata

@@ -7,9 +7,9 @@ namespace App\Pixelforge;
 use App\Enums\PixelforgeErrorCode;
 use App\Exceptions\PixelforgeException;
 use App\Pixelforge\Data\CreatedGeneration;
-use App\Pixelforge\Data\Generation;
 use App\Pixelforge\Data\NewGeneration;
 use App\Pixelforge\Data\Pricing;
+use App\Pixelforge\Data\RemoteGeneration;
 use App\Pixelforge\Data\UsageDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\ConnectionException;
@@ -38,7 +38,7 @@ class PixelforgeClient
             ->post('/generations', $generation->toArray()));
 
         return new CreatedGeneration(
-            generation: Generation::fromArray($response->json()),
+            generation: RemoteGeneration::fromArray($response->json()),
             replayed: $response->header('Idempotent-Replayed') === 'true',
         );
     }
@@ -48,12 +48,12 @@ class PixelforgeClient
      *
      * @throws PixelforgeException
      */
-    public function getGeneration(string $pixelforgeId): Generation
+    public function getGeneration(string $pixelforgeId): RemoteGeneration
     {
         $response = $this->send('GET /generations/{id}', fn (): Response => $this->request()
             ->get('/generations/'.rawurlencode($pixelforgeId)));
 
-        return Generation::fromArray($response->json());
+        return RemoteGeneration::fromArray($response->json());
     }
 
     /**

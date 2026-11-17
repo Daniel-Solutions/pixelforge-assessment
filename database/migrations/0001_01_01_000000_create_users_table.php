@@ -19,6 +19,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->boolean('is_admin')->default(false);
+            $table->bigInteger('balance')->default(0)->comment('Nanodollars. Cache of SUM(ledger_entries.amount), updated in the same transaction.');
             $table->rememberToken();
             $table->timestamps();
         });
