@@ -22,6 +22,22 @@ Setup: local app (`php artisan serve`, `queue:work`, `schedule:work`, SQLite) wi
 
 Money checks: every `charged_amount` is exactly `provider_cost × 1.25`; the demo balance ($1 welcome + $25 − 6 charges = $25.414706250) equals the sum of its ledger entries; failures and rejected submits have zero cost and no ledger entry.
 
-## Run 2: production
+## Run 2: production (2026-11-18 UTC)
 
-_To be filled in after the deploy, with the production key and the Funnel URL. Leave these generations in place (including the failures) for PromptEdit to compare with Pixelforge's records._
+Setup: `https://pixelforge.taila7ffb4.ts.net` (UbServer, Tailscale Funnel, MySQL 8.4) with the **production** Pixelforge key and its webhook URL. Same scenarios as run 1, submitted through the public UI (Playwright) as the demo user after buying $25 of test credits. These generations are left in place, including the failures, for comparison with Pixelforge's records.
+
+| #   | Scenario                                    | Result                                                                                                        |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 0   | "Send test event"                           | ✓ `ping`, signature verified, `ignored`; an unsigned `POST` gets 400                                          |
+| 1   | Normal: low, medium, high (landscape)       | ✓ charged $0.020350000, $0.082703125, $0.396806250 (= cost × 1.25, each inside its estimate)                  |
+| 2   | Medium portrait, 2 reference image URLs     | ✓ usage `11 / 1530 / 1650 / 300`, charged $0.106381250 (est. $0.1048–$0.1330)                                 |
+| 3   | `[fail]`                                    | ✓ `generation_failed`, cost 0, no ledger entry                                                                |
+| 4   | `[blocked]`                                 | ✓ `content_policy_violation` on the first attempt, cost 0                                                     |
+| 5   | `[overloaded]`                              | ✓ 14 attempts over 10 minutes, then `retries_exhausted`, cost 0                                               |
+| 6   | `[duplicate]`                               | ✓ redeliveries logged `duplicate` (3 in this run), one charge per generation                                  |
+| 7   | `[slow]`                                    | ✓ `processing` then `succeeded`, charged $0.019115625                                                         |
+| 8   | 4 submits in a row                          | ✓ the 4th waited with `concurrency_limit_exceeded` ("Waiting for a free slot…"), sent on attempt 4, succeeded |
+| 9   | Resend a delivered event from the dashboard | _not repeated in production (verified in run 1)_                                                              |
+| 10  | `php artisan pixelforge:reconcile-usage`    | ✓ 2026-11-18: 6 generations, ours `0.513705000` = Pixelforge `0.513705000`, difference `0.000000000`          |
+
+Money checks: the demo balance ($1 welcome + $25 − 6 charges) is $25.357868750, equal to the sum of its ledger entries.
