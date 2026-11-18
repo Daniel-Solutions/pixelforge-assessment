@@ -33,4 +33,18 @@ return [
     */
     'webhook_tolerance_seconds' => 300,
 
+    /*
+    | Seeded accounts. The admin can open /admin/report; is_admin is never settable from a request.
+    */
+    'admin' => [
+        'name' => env('ADMIN_NAME', 'Admin'),
+        'email' => env('ADMIN_EMAIL'),
+        'password' => env('ADMIN_PASSWORD'),
+    ],
+
+    'demo' => [
+        'email' => env('DEMO_EMAIL', 'demo@example.com'),
+        'password' => env('DEMO_PASSWORD'),
+    ],
+
 ];

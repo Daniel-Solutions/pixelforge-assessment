@@ -28,6 +28,7 @@ return new class extends Migration
 
             $table->bigInteger('estimated_min');
             $table->bigInteger('estimated_max');
+            $table->json('estimated_tokens')->comment('{min: {...}, max: {...}} token counts behind the estimate');
             $table->json('rates')->nullable();
 
             $table->unsignedInteger('input_text_tokens')->nullable();

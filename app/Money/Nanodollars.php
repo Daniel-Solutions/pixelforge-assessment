@@ -96,6 +96,16 @@ final readonly class Nanodollars
         return ($this->amount < 0 ? '-' : '').'$'.self::decimal($scaled, $decimals);
     }
 
+    /**
+     * For Resources: the rounded display string and the exact 9-place amount (shown in a tooltip).
+     *
+     * @return array{display: string, exact: string}
+     */
+    public function forDisplay(int $decimals = 4): array
+    {
+        return ['display' => $this->format($decimals), 'exact' => $this->toDecimalString()];
+    }
+
     private static function divideHalfUp(int $value, int $divisor): int
     {
         $half = intdiv($divisor, 2);

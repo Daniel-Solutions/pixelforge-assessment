@@ -15,6 +15,7 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         Http::preventStrayRequests();
+        $this->withoutVite();
     }
 
     protected function skipUnlessFortifyHas(string $feature, ?string $message = null): void

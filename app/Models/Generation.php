@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Casts\AsNanodollars;
+use App\Data\GenerationInput;
 use App\Enums\GenerationStatus;
 use App\Enums\PixelforgeErrorCode;
 use App\Enums\Quality;
@@ -34,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property list<string> $reference_images
  * @property Nanodollars $estimated_min
  * @property Nanodollars $estimated_max
+ * @property array{min: array{input_text_tokens: int, input_image_tokens: int, output_tokens: int, reasoning_tokens: int}, max: array{input_text_tokens: int, input_image_tokens: int, output_tokens: int, reasoning_tokens: int}} $estimated_tokens
  * @property array{input_text_tokens: string, input_image_tokens: string, output_tokens: string, reasoning_tokens: string}|null $rates
  * @property int|null $input_text_tokens
  * @property int|null $input_image_tokens
@@ -55,6 +57,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class Generation extends Model
 {
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
+
     /** @use HasFactory<GenerationFactory> */
     use HasFactory;
 
@@ -70,6 +77,7 @@ class Generation extends Model
             'size' => Size::class,
             'quality' => Quality::class,
             'reference_images' => 'array',
+            'estimated_tokens' => 'array',
             'rates' => 'array',
             'estimated_min' => AsNanodollars::class,
             'estimated_max' => AsNanodollars::class,
@@ -119,6 +127,14 @@ class Generation extends Model
             referenceImages: $this->reference_images,
             metadata: ['generation_uuid' => $this->uuid, 'app_env' => $appEnv],
         );
+    }
+
+    /**
+     * The same request again, for "Retry": it becomes a new generation with a new Idempotency-Key.
+     */
+    public function toInput(): GenerationInput
+    {
+        return new GenerationInput($this->prompt, $this->size, $this->quality, $this->reference_images);
     }
 
     public function usage(): ?TokenUsage

@@ -70,3 +70,17 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Poll what webhooks missed, every minute.** `ReconcilePendingGenerations` (scheduled `everyMinute`, `ShouldBeUnique`) picks generations Pixelforge accepted that are still `queued`/`processing` more than 2 minutes after creation (normal runs take 5-30 s, `[slow]` up to 90 s), oldest first, at most 20 per run, and passes `GET /v1/generations/{id}` to `ApplyGenerationState`. A rate limit or a bad key stops the run; other errors skip that generation. Generations without a `pixelforge_id` are not polled: the send job owns them until it succeeds or fails them.
 
 **The billing day is the UTC day of `completed_at`.** That is how `/v1/usage` buckets cost. `pixelforge:reconcile-usage --from= --to=` sums `provider_cost`, count and tokens with `SUM` over bigints grouped by `DATE(completed_at)` for every generation with a provider cost (succeeded ones, plus the rare billed-after-local-failure), and compares them with `/v1/usage` day by day. It exits non-zero on any difference. The MySQL connection uses `timezone +00:00` so `DATE()` is a UTC day.
+
+## Product and UI
+
+**Studio layout copied from promptedit.com/ai/image.** Generate is a composer column (prompt, reference image URLs, size and quality as segmented controls) with a sticky footer holding the live price range and the lime GENERATE button; the right side shows the estimate breakdown by token type (collapsible). History lists generations as cards (stacked on mobile) with status badge, estimate range, final price or "Not charged", and the plain-language status line. A detail page (`/generations/{uuid}`) shows estimated vs. actual tokens. Prototype: `docs/design/prototype.html`.
+
+**Users see their price, never our provider cost.** `GenerationResource` exposes `estimate` and `charged` (each as a 4-place display string plus the exact 9-place value for a tooltip) and no provider cost or profit.
+
+**Live status by Inertia polling, only while something is pending.** `usePendingPoll` reloads only the `generations` (or `generation`) prop and `hasPending` every 3 s and stops when every generation on the page is final. Rejected: websockets (Reverb is extra infrastructure for a 3-second refresh).
+
+**UUIDs in URLs.** Generations are routed by `uuid`, so ids are not guessable; the policy still checks ownership (tested by requesting another user's uuid).
+
+**Retry creates a new generation.** A failed generation stays failed; "Retry" submits the same input as a new row with a new `Idempotency-Key` (reusing the old key would replay the old failure).
+
+**Estimated tokens are stored.** `estimated_tokens` keeps the min/max token counts used for the stored estimate, so the detail page compares estimate and actual even if Pixelforge's tables change later.

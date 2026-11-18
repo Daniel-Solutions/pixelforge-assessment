@@ -1,0 +1,473 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Pixelforge Studio prototype</title>
+        <link rel="preconnect" href="https://fonts.bunny.net" />
+        <link
+            href="https://fonts.bunny.net/css?family=inter:400,500,600,700|bricolage-grotesque:700,800|roboto-mono:400,500"
+            rel="stylesheet"
+        />
+        <style>
+            /* Same tokens as resources/css/app.css (see docs/design.md). */
+            :root {
+                --background: #fbfaf9;
+                --foreground: #262626;
+                --card: #ffffff;
+                --primary: #262626;
+                --primary-foreground: #ffffff;
+                --secondary: #f0f0f0;
+                --muted-foreground: #595959;
+                --subtle-foreground: #6b6b6b;
+                --sunken: rgb(38 38 38 / 0.024);
+                --brand: #9ae600;
+                --brand-foreground: #262626;
+                --brand-ink: #497d00;
+                --warning: #faa23d;
+                --destructive-foreground: #dc2626;
+                --control: #ffffff;
+                --border: #e5e5e5;
+                --input: #d4d4d4;
+                --shadow-control: 0 1px 2px 0 rgb(38 38 38 / 0.08);
+                --shadow-cta:
+                    inset 0 1px 0 0 rgb(255 255 255 / 0.45),
+                    inset 0 -2px 0 0 rgb(38 38 38 / 0.14),
+                    0 1px 2px 0 rgb(38 38 38 / 0.1),
+                    0 8px 20px -6px rgb(73 125 0 / 0.2);
+            }
+            .dark {
+                --background: #171717;
+                --foreground: #ffffff;
+                --card: #1f1f1f;
+                --primary: #ffffff;
+                --primary-foreground: #262626;
+                --secondary: #303030;
+                --muted-foreground: rgb(255 255 255 / 0.8);
+                --subtle-foreground: rgb(255 255 255 / 0.6);
+                --sunken: rgb(255 255 255 / 0.024);
+                --brand-ink: #9ae600;
+                --destructive-foreground: #f87171;
+                --control: #303030;
+                --border: rgb(255 255 255 / 0.1);
+                --input: #454545;
+                --shadow-control: inset 0 -1px 0 0 rgb(38 38 38 / 0.04);
+            }
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 0;
+                font:
+                    400 14px/1.5 Inter,
+                    system-ui,
+                    sans-serif;
+                background: var(--background);
+                color: var(--foreground);
+            }
+            header {
+                height: 64px;
+                display: flex;
+                align-items: center;
+                gap: 32px;
+                padding: 0 24px;
+                border-bottom: 1px solid var(--border);
+            }
+            .logo {
+                font:
+                    800 18px 'Bricolage Grotesque',
+                    serif;
+                letter-spacing: -0.02em;
+            }
+            nav a {
+                font-weight: 600;
+                color: var(--foreground);
+                text-decoration: none;
+                margin-right: 20px;
+            }
+            nav a.active {
+                box-shadow: inset 0 -2px 0 var(--brand-ink);
+                padding-bottom: 21px;
+            }
+            .right {
+                margin-left: auto;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+            }
+            .pill {
+                font-weight: 600;
+                font-size: 12px;
+                border: 1px solid var(--input);
+                background: var(--control);
+                border-radius: 8px;
+                padding: 6px 10px;
+                box-shadow: var(--shadow-control);
+            }
+            .btn-dark {
+                font-weight: 600;
+                font-size: 12px;
+                border-radius: 8px;
+                padding: 7px 10px;
+                background: var(--primary);
+                color: var(--primary-foreground);
+                border: 0;
+            }
+            .studio {
+                display: grid;
+                grid-template-columns: 336px 1fr;
+                min-height: calc(100vh - 64px);
+            }
+            aside {
+                background: linear-gradient(
+                    to top,
+                    color-mix(in oklab, var(--brand) 10%, var(--card)) 0%,
+                    var(--card) 40%
+                );
+                border-right: 1px solid var(--border);
+                display: flex;
+                flex-direction: column;
+            }
+            .fields {
+                padding: 20px;
+                display: grid;
+                gap: 18px;
+            }
+            .label {
+                display: flex;
+                justify-content: space-between;
+                font-size: 11px;
+                letter-spacing: 0.88px;
+                text-transform: uppercase;
+                color: var(--muted-foreground);
+                margin-bottom: 6px;
+            }
+            .label span:last-child {
+                color: var(--subtle-foreground);
+            }
+            textarea,
+            input,
+            select {
+                width: 100%;
+                font: inherit;
+                color: inherit;
+                background: var(--control);
+                border: 1px solid var(--input);
+                border-radius: 8px;
+                padding: 10px 12px;
+                box-shadow: var(--shadow-control);
+            }
+            textarea {
+                min-height: 140px;
+                resize: vertical;
+            }
+            .dashed {
+                border: 1px dashed var(--input);
+                border-radius: 8px;
+                padding: 9px 12px;
+                background: var(--control);
+            }
+            .segmented {
+                display: flex;
+                padding: 2px;
+                background: var(--secondary);
+                border: 1px solid var(--input);
+                border-radius: 8px;
+            }
+            .segmented button {
+                flex: 1;
+                font: 600 12px Inter;
+                border: 1px solid transparent;
+                background: transparent;
+                color: var(--subtle-foreground);
+                border-radius: 4px;
+                padding: 6px 4px;
+            }
+            .segmented button.on {
+                background: var(--control);
+                border-color: var(--input);
+                color: var(--foreground);
+                box-shadow: var(--shadow-control);
+            }
+            .footer {
+                margin-top: auto;
+                border-top: 1px solid var(--border);
+                padding: 10px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 12px;
+            }
+            .estimate b {
+                display: block;
+                font-weight: 500;
+            }
+            .estimate small {
+                color: var(--subtle-foreground);
+                font-size: 11px;
+            }
+            .cta {
+                font: 700 14px Inter;
+                letter-spacing: 0.35px;
+                text-transform: uppercase;
+                background: var(--brand);
+                color: var(--brand-foreground);
+                border: 1px solid rgb(0 0 0 / 0.1);
+                border-radius: 12px;
+                padding: 12px 18px;
+                box-shadow: var(--shadow-cta);
+            }
+            main {
+                padding: 20px 24px;
+            }
+            h2 {
+                font-size: 14px;
+                font-weight: 600;
+                margin: 0 0 16px;
+            }
+            .panel {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                padding: 20px;
+                max-width: 640px;
+            }
+            table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 13px;
+            }
+            td,
+            th {
+                padding: 8px 0;
+                border-bottom: 1px solid var(--border);
+                text-align: left;
+            }
+            th {
+                font-weight: 500;
+                color: var(--muted-foreground);
+            }
+            td.n,
+            th.n {
+                text-align: right;
+                font-family: 'Roboto Mono', monospace;
+            }
+            .note {
+                color: var(--muted-foreground);
+                font-size: 13px;
+                margin-top: 12px;
+            }
+            .row {
+                display: grid;
+                grid-template-columns: 72px 1fr 120px 150px 110px;
+                gap: 16px;
+                align-items: center;
+                padding: 12px;
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 16px;
+                margin-bottom: 10px;
+            }
+            .thumb {
+                width: 72px;
+                height: 72px;
+                border-radius: 8px;
+                background: var(--sunken);
+                border: 1px solid var(--border);
+                display: grid;
+                place-items: center;
+                font-size: 10px;
+                color: var(--subtle-foreground);
+                text-align: center;
+            }
+            .thumb.img {
+                background: linear-gradient(135deg, #f4a462, #2a9d90);
+            }
+            .prompt {
+                font-weight: 500;
+            }
+            .meta {
+                color: var(--subtle-foreground);
+                font-size: 12px;
+            }
+            .badge {
+                display: inline-flex;
+                gap: 6px;
+                align-items: center;
+                font: 600 12px Inter;
+                border-radius: 999px;
+                padding: 3px 10px;
+                border: 1px solid var(--input);
+                background: var(--control);
+            }
+            .dot {
+                width: 7px;
+                height: 7px;
+                border-radius: 50%;
+                background: var(--subtle-foreground);
+            }
+            .b-processing .dot {
+                background: var(--warning);
+            }
+            .b-succeeded .dot {
+                background: var(--brand-ink);
+            }
+            .b-failed {
+                color: var(--destructive-foreground);
+            }
+            .b-failed .dot {
+                background: var(--destructive-foreground);
+            }
+            .money {
+                font-family: 'Roboto Mono', monospace;
+                font-size: 12px;
+            }
+            .fail {
+                color: var(--destructive-foreground);
+                font-size: 12px;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <span class="logo">Pixelforge Studio</span>
+            <nav>
+                <a class="active" href="#">Generate</a><a href="#">History</a
+                ><a href="#">Report</a>
+            </nav>
+            <div class="right">
+                <span class="pill">$0.9532 credit</span>
+                <button class="btn-dark">Buy credits</button>
+            </div>
+        </header>
+
+        <section class="studio">
+            <aside>
+                <div class="fields">
+                    <div>
+                        <div class="label">
+                            <span>Prompt</span><span>45/4000</span>
+                        </div>
+                        <textarea>
+A lighthouse on a cliff at dawn, oil painting</textarea>
+                    </div>
+                    <div>
+                        <div class="label">
+                            <span>Reference images</span><span>1/4</span>
+                        </div>
+                        <input value="https://example.com/style.png" />
+                        <div class="dashed" style="margin-top: 8px">
+                            + Add image URL
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label"><span>Size</span></div>
+                        <div class="segmented">
+                            <button>Square</button><button>Landscape</button
+                            ><button class="on">Portrait</button>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="label"><span>Quality</span></div>
+                        <div class="segmented">
+                            <button>Low</button
+                            ><button class="on">Medium</button
+                            ><button>High</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="footer">
+                    <div class="estimate">
+                        <b>$0.0953 – $0.1234</b><small>Estimated price</small>
+                    </div>
+                    <button class="cta">Generate</button>
+                </div>
+            </aside>
+
+            <main>
+                <h2>Cost estimate</h2>
+                <div class="panel">
+                    <table>
+                        <tr>
+                            <th>Tokens</th>
+                            <th class="n">Min</th>
+                            <th class="n">Max</th>
+                        </tr>
+                        <tr>
+                            <td>Prompt text (±15%)</td>
+                            <td class="n">10</td>
+                            <td class="n">14</td>
+                        </tr>
+                        <tr>
+                            <td>Reference images (765 each)</td>
+                            <td class="n">765</td>
+                            <td class="n">765</td>
+                        </tr>
+                        <tr>
+                            <td>Image output</td>
+                            <td class="n">1,650</td>
+                            <td class="n">1,650</td>
+                        </tr>
+                        <tr>
+                            <td>Reasoning</td>
+                            <td class="n">200</td>
+                            <td class="n">2,000</td>
+                        </tr>
+                        <tr>
+                            <td><b>Your price</b></td>
+                            <td class="n"><b>$0.0953</b></td>
+                            <td class="n"><b>$0.1234</b></td>
+                        </tr>
+                    </table>
+                    <p class="note">
+                        Final price is calculated from actual usage when the
+                        image is ready. Failed generations are free.
+                    </p>
+                </div>
+
+                <h2 style="margin-top: 32px">History</h2>
+                <div class="row">
+                    <div class="thumb img"></div>
+                    <div>
+                        <div class="prompt">
+                            A lighthouse on a cliff at dawn, oil painting
+                        </div>
+                        <div class="meta">Portrait · Medium · 2 min ago</div>
+                    </div>
+                    <span class="badge b-succeeded"
+                        ><i class="dot"></i>Succeeded</span
+                    >
+                    <div class="money">Est. $0.0953 – $0.1234</div>
+                    <div class="money"><b>$0.1087</b></div>
+                </div>
+                <div class="row">
+                    <div class="thumb">…</div>
+                    <div>
+                        <div class="prompt">A fox in the snow [slow]</div>
+                        <div class="meta">Generating your image.</div>
+                    </div>
+                    <span class="badge b-processing"
+                        ><i class="dot"></i>Processing</span
+                    >
+                    <div class="money">Est. $0.0141 – $0.0219</div>
+                    <div class="money">—</div>
+                </div>
+                <div class="row">
+                    <div class="thumb">Failed</div>
+                    <div>
+                        <div class="prompt">Castle [fail]</div>
+                        <div class="fail">
+                            The provider could not produce an image. You were
+                            not charged.
+                        </div>
+                    </div>
+                    <span class="badge b-failed"
+                        ><i class="dot"></i>Failed</span
+                    >
+                    <div class="money">Est. $0.0141 – $0.0219</div>
+                    <div class="money">Not charged</div>
+                </div>
+            </main>
+        </section>
+    </body>
+</html>

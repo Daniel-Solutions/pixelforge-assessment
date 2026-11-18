@@ -46,6 +46,7 @@ class SubmitGeneration
                 'reference_images' => $input->referenceImages,
                 'estimated_min' => $estimate->minPrice,
                 'estimated_max' => $estimate->maxPrice,
+                'estimated_tokens' => ['min' => $estimate->min->toArray(), 'max' => $estimate->max->toArray()],
             ]);
 
             SendGenerationToPixelforge::dispatch($generation)->afterCommit();

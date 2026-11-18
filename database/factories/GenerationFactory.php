@@ -36,6 +36,10 @@ class GenerationFactory extends Factory
             'reference_images' => ['https://example.com/style.png'],
             'estimated_min' => Nanodollars::of(95_250_000),
             'estimated_max' => Nanodollars::of(467_343_750),
+            'estimated_tokens' => [
+                'min' => ['input_text_tokens' => 10, 'input_image_tokens' => 765, 'output_tokens' => 6450, 'reasoning_tokens' => 1000],
+                'max' => ['input_text_tokens' => 14, 'input_image_tokens' => 765, 'output_tokens' => 6450, 'reasoning_tokens' => 8000],
+            ],
         ];
     }
 
