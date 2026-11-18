@@ -9,6 +9,7 @@ use App\Models\LedgerEntry;
 use App\Models\WebhookEvent;
 use App\Money\Nanodollars;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Testing\TestResponse;
 
 /**
@@ -288,5 +289,50 @@ describe('local failure, provider success', function (): void {
             ->and($generation->provider_cost?->toDecimalString())->toBe('0.305510000')
             ->and($generation->charged_amount?->amount)->toBe(0)
             ->and(LedgerEntry::query()->count())->toBe(0);
+    });
+});
+
+describe('review fixes', function (): void {
+    it('records the provider cost even when processing linked the locally failed row first', function (): void {
+        $generation = Generation::factory()->create([
+            'status' => GenerationStatus::Failed,
+            'failure_code' => 'retries_exhausted',
+            'provider_cost' => Nanodollars::zero(),
+            'charged_amount' => Nanodollars::zero(),
+        ]);
+
+        deliverWebhook(eventFor($generation, 'processing', ['id' => 'gen_late']))->assertOk()->assertJson(['result' => 'stale']);
+        deliverWebhook(eventFor($generation->refresh(), 'succeeded'))->assertOk()->assertJson(['result' => 'billed_after_local_failure']);
+
+        expect($generation->refresh()->status)->toBe(GenerationStatus::Failed)
+            ->and($generation->provider_cost?->toDecimalString())->toBe('0.305510000')
+            ->and($generation->charged_amount?->amount)->toBe(0)
+            ->and(LedgerEntry::query()->count())->toBe(0);
+    });
+
+    it('prices with the rates stored at creation, not the payload\'s', function (): void {
+        $generation = Generation::factory()->processing()->create();
+        $event = eventFor($generation, 'succeeded');
+        $event['data']['object']['rates']['reasoning_tokens'] = '99.00';
+
+        deliverWebhook($event)->assertOk();
+
+        expect($generation->refresh()->provider_cost?->toDecimalString())->toBe('0.305510000');
+    });
+
+    it('charges the real price but flags it when usage goes past the estimate', function (): void {
+        Log::spy();
+        $generation = Generation::factory()->processing()->create(['estimated_max' => Nanodollars::of(1)]);
+
+        deliverWebhook(eventFor($generation, 'succeeded'))->assertOk();
+
+        expect($generation->refresh()->charged_amount?->toDecimalString())->toBe('0.381887500');
+        Log::shouldHaveReceived('warning')->with('generation.charged_above_estimate', Mockery::any())->once();
+    });
+
+    it('answers 400, not 500, when the webhook secret is not set at all', function (): void {
+        config(['pixelforge.webhook_secret' => null]);
+
+        deliverWebhook(pixelforgeEvent('ping', []))->assertStatus(400);
     });
 });

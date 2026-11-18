@@ -28,6 +28,14 @@ class SendGenerationToPixelforge implements ShouldQueue
     /** Retries are bounded by retryUntil(), not by a count. */
     public int $tries = 0;
 
+    /**
+     * Seconds before retrying after an unexpected exception (Pixelforge errors pick their own delay).
+     * Without it the worker would retry at once and burn the shared 60 requests/minute.
+     *
+     * @var list<int>
+     */
+    public array $backoff = [5, 15, 30, 60];
+
     /** Stop retrying this long after the user pressed Generate. */
     public const int DEADLINE_MINUTES = 10;
 

@@ -96,3 +96,46 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Database driver for queue, cache and sessions.** One less service than Redis, and the load is a handful of jobs per minute.
 
 **Auth routes throttled.** The app is public: Fortify routes are limited to 30 requests per minute per IP (plus Fortify's own login limiter), generation submits to 10 per minute per user.
+
+## Stretch: admin report
+
+**Same day rule as Pixelforge.** `/admin/report` (gate `view-admin-report`, `is_admin` only, set by seeder) groups by `DATE(completed_at)` in UTC and by user: succeeded and failed counts, credit spent (`SUM(charged_amount)`), provider cost (`SUM(provider_cost)`) and profit (always charged − cost from the two stored sums). Totals per day, per user and overall; default range is the last 30 days. Each day shows "Pixelforge reported" from `/v1/usage` (cached 60 s) with ✓ or the exact difference; if Pixelforge cannot answer (error, or more than 92 days), our numbers still show and the column is empty. The aggregate query runs through `toBase()` so the aliases are not cast to `Nanodollars` by the model.
+
+## Stretch: balance
+
+**The ledger is the truth, `users.balance` is a cache.** Every purchase (positive) and charge (negative) is a `ledger_entries` row; `RecordLedgerEntry` updates `users.balance` in the same transaction with the user row locked. A test checks `SUM(amount) = balance`.
+
+**Available balance reserves the maximum.** Available = balance − Σ `estimated_max` of the user's unfinished generations. `SubmitGeneration` locks the user row and refuses (`InsufficientCredits`) when available < the new generation's `estimated_max`, so two simultaneous submits are serialized and cannot both spend the same credit (the lock is real on MySQL; SQLite serializes writes). On success the real `charged_amount` (always ≤ the maximum) is charged; on failure nothing is charged and the reservation disappears because the generation is final. The Generate button is disabled with "Not enough credits: this generation can cost up to $X. Buy credits", and the server checks again. Rejected: a separate "hold" ledger entry (two more writes per generation and a release step that can be forgotten).
+
+**Fake purchases, idempotent.** Fixed packages ($5, $10, $25). The page sends a one-time `purchase_token` (a UUID made in the browser); the action checks it and `purchase_token` is unique in the database, so a double click buys once. New users (registration and seeded accounts) get a $1 welcome credit as a `purchase` entry with token `welcome-{id}`.
+
+**A missing API key is a typed error.** Found while testing the report locally: with `PIXELFORGE_API_KEY` unset, the client now throws `PixelforgeException(invalid_api_key)` (logged as critical) instead of a config exception, so every caller's error handling applies.
+
+## Code review fixes
+
+A review of the whole diff found ten issues; all were fixed with tests:
+
+- **Billed after local failure, any event order.** The rule now keys on "failed locally (not with Pixelforge's own `generation_failed`/`internal_error`), no provider cost yet", so a `processing` event that links the row first no longer hides the later `succeeded`.
+- **Stored rates win.** Cost uses the rates saved at creation; the payload's rates are used only if none were stored.
+- **Usage above the estimate.** Pixelforge's documented ranges keep usage inside the estimate. If it ever reports more, we still charge the real price (cost + 25%) but log `generation.charged_above_estimate`; capping would break "price = cost + 25%". The Credits page no longer promises "never more than the maximum".
+- **Admin report cache.** The cache store does not unserialize objects (`serializable_classes => false`), so the report caches plain integers per day; a second load used to 500.
+- **Purchase token from the server.** `crypto.randomUUID()` does not exist on plain-HTTP origins (`http://pixelforge.test`); the server now issues the token per page view.
+- **Backoff for unexpected errors** in the send job (`[5, 15, 30, 60]` s), so a bug cannot burn the shared 60 requests/minute.
+- **Reconciliation rotates** (least recently checked first, each poll touches the row) and survives any exception per row, so stuck rows cannot starve newer ones.
+- **Missing webhook secret** returns the documented 400 instead of a 500.
+- **Usage comparison covers both sides' days**, so a cost we recorded on a day Pixelforge did not report is flagged.
+- **Accounts with generations cannot be deleted**: the cascade would erase billing records that Pixelforge still counts.
+
+## Verified against the real API
+
+The full QA script ran locally against Pixelforge with a local key and webhooks through an ngrok tunnel (`docs/qa.md`, run 1): every keyword scenario behaved as designed, `[duplicate]` deliveries were absorbed, the concurrency wait showed and resolved, a dashboard resend was a no-op, and `pixelforge:reconcile-usage` matched `/v1/usage` to `0.000000000`.
+
+## Left out and why
+
+- **Storing images.** Pixelforge keeps images for 24 hours; after `image_url_expires_at` the UI shows "Image expired" instead of a broken image. Storing them (S3 or disk) was not asked and adds storage, cleanup and cost.
+- **Real payments.** "Buy credits" is a test purchase that writes a ledger entry. A payment provider (Stripe Checkout + webhook) would reuse the same idempotent `BuyCredits` path.
+- **Websockets for live status.** 3-second Inertia polling, only while something is pending, is enough here and needs no extra service.
+- **Two-factor auth, passkeys, email verification.** Removed from the starter kit: not part of the assessment, and fewer moving parts on a public URL.
+- **Refunds and admin balance adjustments.** The ledger supports new entry types, but no screen creates them.
+- **Per-user rate limiting beyond 10 submits/minute and the credit check.** Pixelforge's limits are per account, shared by all users; a fair-share queue would matter with many users, not for this evaluation.
+- **Browser tests.** By request; the proof is Pest (244 tests, MySQL and SQLite), Vitest, and the manual QA run in `docs/qa.md`.

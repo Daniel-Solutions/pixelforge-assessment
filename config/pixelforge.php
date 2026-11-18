@@ -24,6 +24,11 @@ return [
     'markup_percent' => 25,
 
     /*
+    | Credit every new user starts with, in nanodollars ($1).
+    */
+    'welcome_credit_nanodollars' => 1_000_000_000,
+
+    /*
     | Seconds GET /v1/pricing stays cached. Pricing feeds estimates only.
     */
     'pricing_cache_seconds' => 3600,

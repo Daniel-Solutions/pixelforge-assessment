@@ -46,6 +46,14 @@ enum PixelforgeErrorCode: string
     }
 
     /**
+     * A failure Pixelforge reported for an accepted generation (as opposed to one we decided locally).
+     */
+    public function isProviderGenerationFailure(): bool
+    {
+        return $this === self::GenerationFailed || $this === self::InternalError;
+    }
+
+    /**
      * Errors that mean our configuration or code is wrong, not the user's input.
      */
     public function isOurBug(): bool

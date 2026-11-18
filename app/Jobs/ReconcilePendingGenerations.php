@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Webhooks are not guaranteed. Every minute, poll Pixelforge for generations it accepted that are
@@ -36,11 +37,15 @@ class ReconcilePendingGenerations implements ShouldBeUnique, ShouldQueue
             ->pending()
             ->whereNotNull('pixelforge_id')
             ->where('provider_created_at', '<=', now()->subSeconds(self::STALE_AFTER_SECONDS))
-            ->oldest('provider_created_at')
+            // Least recently checked first: each poll touches updated_at, so rows that never resolve rotate
+            // to the back instead of filling every run.
+            ->oldest('updated_at')
             ->limit(self::MAX_PER_RUN)
             ->get();
 
         foreach ($overdue as $generation) {
+            $generation->touch();
+
             try {
                 $result = $applyGenerationState->handle($generation, $pixelforge->getGeneration((string) $generation->pixelforge_id));
             } catch (PixelforgeException $exception) {
@@ -49,6 +54,10 @@ class ReconcilePendingGenerations implements ShouldBeUnique, ShouldQueue
                 if (in_array($exception->errorCode, [PixelforgeErrorCode::RateLimitExceeded, PixelforgeErrorCode::InvalidApiKey], true)) {
                     return;
                 }
+
+                continue;
+            } catch (Throwable $exception) {
+                report($exception);
 
                 continue;
             }

@@ -11,6 +11,7 @@ use App\Enums\StateChange;
 use App\Models\Generation;
 use App\Money\Nanodollars;
 use App\Money\ProviderCost;
+use App\Pixelforge\Data\Rates;
 use App\Pixelforge\Data\RemoteGeneration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,8 +41,6 @@ class ApplyGenerationState
                 return StateChange::Unknown;
             }
 
-            $wasAcceptedBefore = $locked->pixelforge_id !== null;
-
             $locked->fill([
                 'pixelforge_id' => $remote->id,
                 'rates' => $locked->rates ?? $remote->rates->toArray(),
@@ -50,7 +49,7 @@ class ApplyGenerationState
             ]);
 
             $change = match (true) {
-                ! $wasAcceptedBefore && $locked->status === GenerationStatus::Failed && $remote->status === GenerationStatus::Succeeded => $this->recordCostOnly($locked, $remote),
+                $this->wasBilledAfterLocalFailure($locked, $remote) => $this->recordCostOnly($locked, $remote),
                 $remote->status->rank() <= $locked->status->rank() => StateChange::Stale,
                 default => $this->moveForward($locked, $remote),
             };
@@ -101,10 +100,43 @@ class ApplyGenerationState
         return StateChange::Applied;
     }
 
+    /**
+     * A succeeded event for a row we failed locally (before Pixelforge's own failure codes were ever seen),
+     * with no provider cost recorded yet, means we gave up on the submit but Pixelforge did create and finish it.
+     * This holds whether or not a processing event linked the row first. A failure reported by Pixelforge
+     * itself is final there and is never turned into a billed one.
+     */
+    private function wasBilledAfterLocalFailure(Generation $generation, RemoteGeneration $remote): bool
+    {
+        return $generation->status === GenerationStatus::Failed
+            && ! (PixelforgeErrorCode::tryFrom((string) $generation->failure_code)?->isProviderGenerationFailure() ?? false)
+            && $remote->status === GenerationStatus::Succeeded
+            && ($generation->provider_cost === null || $generation->provider_cost->amount === 0);
+    }
+
+    /**
+     * The rates stored when the generation was created; the payload's only if we never stored any.
+     */
+    private function ratesFor(Generation $generation, RemoteGeneration $remote): Rates
+    {
+        return $generation->storedRates() ?? $remote->rates;
+    }
+
     private function fillSucceeded(Generation $generation, RemoteGeneration $remote): void
     {
         $usage = $remote->usage ?? throw new LogicException("Succeeded generation {$remote->id} has no usage.");
-        $providerCost = ProviderCost::of($usage, $remote->rates);
+        $providerCost = ProviderCost::of($usage, $this->ratesFor($generation, $remote));
+        $chargedAmount = $providerCost->withMarkup(config()->integer('pixelforge.markup_percent'));
+
+        if ($chargedAmount->amount > $generation->estimated_max->amount) {
+            // Pixelforge documents token ranges that keep usage inside our estimate; if it ever reports more,
+            // we still charge the real price (cost + markup) but flag it, because the reservation was smaller.
+            Log::warning('generation.charged_above_estimate', [
+                'generation_uuid' => $generation->uuid,
+                'charged' => $chargedAmount->toDecimalString(),
+                'estimated_max' => $generation->estimated_max->toDecimalString(),
+            ]);
+        }
 
         $generation->fill([
             'status' => GenerationStatus::Succeeded,
@@ -113,7 +145,7 @@ class ApplyGenerationState
             'output_tokens' => $usage->output,
             'reasoning_tokens' => $usage->reasoning,
             'provider_cost' => $providerCost,
-            'charged_amount' => $providerCost->withMarkup(config()->integer('pixelforge.markup_percent')),
+            'charged_amount' => $chargedAmount,
             'image_url' => $remote->imageUrl,
             'image_url_expires_at' => $remote->imageUrlExpiresAt,
             'started_at' => $generation->started_at ?? $remote->startedAt,
@@ -135,7 +167,7 @@ class ApplyGenerationState
             'input_image_tokens' => $usage->inputImage,
             'output_tokens' => $usage->output,
             'reasoning_tokens' => $usage->reasoning,
-            'provider_cost' => ProviderCost::of($usage, $remote->rates),
+            'provider_cost' => ProviderCost::of($usage, $this->ratesFor($generation, $remote)),
             'completed_at' => $remote->completedAt,
         ]);
 

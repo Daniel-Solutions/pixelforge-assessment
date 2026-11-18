@@ -79,3 +79,19 @@ it('is scheduled every minute', function (): void {
 
     expect($event?->expression)->toBe('* * * * *');
 });
+
+it('rotates through overdue rows and survives unexpected errors', function (): void {
+    $broken = Generation::factory()->processing()->create(['pixelforge_id' => 'gen_broken', 'provider_created_at' => now()->subMinutes(9), 'updated_at' => now()->subMinutes(9)]);
+    $healthy = Generation::factory()->processing()->create(['pixelforge_id' => 'gen_ok', 'provider_created_at' => now()->subMinutes(8), 'updated_at' => now()->subMinutes(8)]);
+    Http::fake([
+        // A succeeded generation without usage makes ApplyGenerationState throw.
+        'pixelforge.test/v1/generations/gen_broken' => Http::response(pixelforgeGeneration(['id' => 'gen_broken', 'status' => 'succeeded', 'usage' => null])),
+        'pixelforge.test/v1/generations/gen_ok' => Http::response(succeededPixelforgeGeneration(['id' => 'gen_ok'])),
+    ]);
+
+    dispatch_sync(new ReconcilePendingGenerations);
+
+    expect($healthy->refresh()->status)->toBe(GenerationStatus::Succeeded)
+        ->and($broken->refresh()->status)->toBe(GenerationStatus::Processing)
+        ->and($broken->updated_at->isAfter(now()->subMinute()))->toBeTrue();
+});

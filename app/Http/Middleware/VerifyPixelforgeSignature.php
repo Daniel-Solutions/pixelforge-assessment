@@ -33,9 +33,9 @@ class VerifyPixelforgeSignature
 
     private function rejectionReason(Request $request): ?string
     {
-        $secret = config()->string('pixelforge.webhook_secret', '');
+        $secret = config('pixelforge.webhook_secret');
 
-        if ($secret === '') {
+        if (! is_string($secret) || $secret === '') {
             Log::critical('pixelforge.webhook.secret_missing');
 
             return 'secret_not_configured';

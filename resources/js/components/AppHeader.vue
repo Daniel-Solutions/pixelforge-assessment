@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { History, Menu, Sparkles } from '@lucide/vue';
+import { ChartColumn, History, Menu, Sparkles } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,9 @@ import {
 } from '@/components/ui/sheet';
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import MoneyAmount from '@/components/studio/MoneyAmount.vue';
+import { report } from '@/routes/admin';
+import { index as credits } from '@/routes/credits';
 import { create, index } from '@/routes/generations';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
@@ -29,6 +32,9 @@ const { isCurrentUrl } = useCurrentUrl();
 const navItems = computed<NavItem[]>(() => [
     { title: 'Generate', href: create(), icon: Sparkles },
     { title: 'History', href: index(), icon: History },
+    ...(user.value.is_admin
+        ? [{ title: 'Report', href: report(), icon: ChartColumn }]
+        : []),
 ]);
 </script>
 
@@ -92,7 +98,17 @@ const navItems = computed<NavItem[]>(() => [
             </nav>
 
             <div class="ml-auto flex items-center gap-2">
-                <slot name="right" />
+                <span
+                    class="hidden rounded-md border border-input bg-control px-2.5 py-1 text-xs font-semibold shadow-control sm:inline"
+                >
+                    <span class="sr-only">Balance: </span>
+                    <MoneyAmount :money="user.balance" /> credit
+                </span>
+                <Link
+                    :href="credits()"
+                    class="h-8 content-center rounded-md border border-input bg-control px-2.5 text-xs font-semibold shadow-control hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    >Buy credits</Link
+                >
                 <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                         <button

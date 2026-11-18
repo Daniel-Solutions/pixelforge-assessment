@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions;
 
 use App\Data\GenerationInput;
+use App\Exceptions\InsufficientCredits;
 use App\Jobs\SendGenerationToPixelforge;
 use App\Models\Generation;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Support\Str;
 
 /**
  * Records the generation locally with its estimate, then sends it to Pixelforge from a queued job.
+ * The user's available balance must cover the estimate's maximum, which stays reserved until the generation is final.
  * The row exists before any network call, so every attempt reuses the same Idempotency-Key.
  */
 class SubmitGeneration
@@ -35,9 +37,17 @@ class SubmitGeneration
         );
 
         return DB::transaction(function () use ($user, $input, $estimate): Generation {
+            // The lock serializes submits per user, so two at once cannot both spend the same credit.
+            $lockedUser = User::query()->lockForUpdate()->findOrFail($user->id);
+            $available = $lockedUser->availableBalance();
+
+            if ($available->amount < $estimate->maxPrice->amount) {
+                throw new InsufficientCredits(required: $estimate->maxPrice, available: $available);
+            }
+
             $uuid = (string) Str::uuid();
 
-            $generation = $user->generations()->create([
+            $generation = $lockedUser->generations()->create([
                 'uuid' => $uuid,
                 'idempotency_key' => $uuid,
                 'prompt' => $input->prompt,

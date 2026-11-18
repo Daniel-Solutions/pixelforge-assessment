@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\SubmitGeneration;
 use App\Enums\Quality;
 use App\Enums\Size;
+use App\Exceptions\InsufficientCredits;
 use App\Exceptions\PixelforgeException;
 use App\Http\Requests\StoreGenerationRequest;
 use App\Http\Resources\GenerationResource;
@@ -46,6 +47,8 @@ class GenerationController extends Controller
     {
         try {
             $submitGeneration->handle($this->user($request), $request->toInput());
+        } catch (InsufficientCredits $exception) {
+            return back()->withErrors(['credits' => $exception->getMessage()]);
         } catch (PixelforgeException) {
             Inertia::flash('toast', ['type' => 'error', 'message' => 'Pricing is unavailable right now, so nothing was submitted. Try again in a minute.']);
 

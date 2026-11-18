@@ -18,7 +18,7 @@ beforeEach(function (): void {
 });
 
 it('stores a queued generation with its estimate and sends it from a job', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
 
     $generation = app(SubmitGeneration::class)->handle($user, new GenerationInput(
         prompt: str_repeat('a', 400),

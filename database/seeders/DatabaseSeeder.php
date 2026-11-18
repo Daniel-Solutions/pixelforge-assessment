@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Actions\GrantWelcomeCredit;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -35,7 +36,12 @@ class DatabaseSeeder extends Seeder
             $user->fill(['name' => $name, 'password' => $password, 'email_verified_at' => now()]);
         }
 
+        $isNew = ! $user->exists;
         $user->is_admin = $isAdmin;
         $user->save();
+
+        if ($isNew) {
+            app(GrantWelcomeCredit::class)->handle($user);
+        }
     }
 }

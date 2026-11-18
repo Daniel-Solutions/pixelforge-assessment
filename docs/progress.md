@@ -1,4 +1,4 @@
 # Progress
 
-- Current step: 8 done, waiting for Daniel to deploy and run docs/qa.md. Next: 9 (stretch: admin report, then balance).
-- Done: 1 (scaffold, tooling, CI, design tokens), 2 (money and estimate, backend and frontend), 3 (Pixelforge client), 4 (data model, submit action, send job with retries), 5 (webhooks), 6 (reconciliation), 7 (Generate, History and detail pages), 8 (deploy files, verified locally).
+- Done: 1-10. Scaffold, money, Pixelforge client, generations and send job, webhooks, reconciliation, UI, deploy files, stretch (admin report, balance and credits), README and final docs. Local QA against the real API passed (`docs/qa.md`, run 1).
+- Deployed at https://pixelforge.taila7ffb4.ts.net; production QA passed (`docs/qa.md`, run 2). Pending (Daniel): disable key expiry, Uptime Kuma monitor, make the repository public.

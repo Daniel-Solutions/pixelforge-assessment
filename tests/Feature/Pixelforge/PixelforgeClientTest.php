@@ -171,3 +171,13 @@ it('reads usage per UTC day with exact costs', function (): void {
     Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'start_date=2026-11-01')
         && str_contains($request->url(), 'end_date=2026-11-02'));
 });
+
+it('treats a missing API key as invalid_api_key without calling Pixelforge', function (): void {
+    config(['pixelforge.api_key' => null]);
+    Http::fake();
+
+    expect(fn () => app(PixelforgeClient::class)->getGeneration('gen_1'))
+        ->toThrow(fn (PixelforgeException $exception) => expect($exception->errorCode)->toBe(PixelforgeErrorCode::InvalidApiKey));
+
+    Http::assertNothingSent();
+});
