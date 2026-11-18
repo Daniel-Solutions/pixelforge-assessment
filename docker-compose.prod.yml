@@ -96,6 +96,8 @@ services:
         <<: *app
         command: php artisan schedule:work
 
+    # The healthcheck pings over TCP (127.0.0.1), not the socket: on first boot MySQL runs a temporary
+    # socket-only server while it initializes, and a socket ping would report healthy too early.
     mysql:
         image: mysql:8.4
         command: --performance-schema=OFF --innodb-buffer-pool-size=256M
@@ -111,7 +113,7 @@ services:
             test:
                 [
                     'CMD-SHELL',
-                    'mysqladmin ping -h localhost -p"$$MYSQL_ROOT_PASSWORD"',
+                    'mysqladmin ping -h 127.0.0.1 -uroot -p"$$MYSQL_ROOT_PASSWORD" --silent',
                 ]
             interval: 5s
             timeout: 5s
