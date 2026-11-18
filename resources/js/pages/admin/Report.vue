@@ -91,8 +91,9 @@ function applyFilter(): void {
             v-if="!report.pixelforge_available"
             class="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
         >
-            Pixelforge usage is unavailable for this range (it allows at most 92
-            days), so the "Pixelforge reported" column is empty.
+            Pixelforge usage could not be loaded (check the logs; it also allows
+            at most 92 days per request), so the "Pixelforge reported" column is
+            empty.
         </p>
 
         <section

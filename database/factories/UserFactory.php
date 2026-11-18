@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Actions\RecordLedgerEntry;
+use App\Enums\LedgerEntryType;
 use App\Models\User;
+use App\Money\Nanodollars;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -33,6 +36,17 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * A user who bought credits, recorded in the ledger like a real purchase.
+     */
+    public function withCredit(int $dollars = 10): static
+    {
+        return $this->afterCreating(function (User $user) use ($dollars): void {
+            app(RecordLedgerEntry::class)->handle($user->id, LedgerEntryType::Purchase, Nanodollars::of($dollars * Nanodollars::PER_DOLLAR));
+            $user->refresh();
+        });
     }
 
     public function admin(): static

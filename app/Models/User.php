@@ -53,6 +53,17 @@ class User extends Authenticatable
     }
 
     /**
+     * Balance minus the most every unfinished generation can still cost (its estimated_max).
+     * A failed generation stops reserving as soon as it is final; a succeeded one is charged its real price.
+     */
+    public function availableBalance(): Nanodollars
+    {
+        $reserved = (int) $this->generations()->pending()->sum('estimated_max');
+
+        return $this->balance->subtract(Nanodollars::of($reserved));
+    }
+
+    /**
      * @return HasMany<Generation, $this>
      */
     public function generations(): HasMany

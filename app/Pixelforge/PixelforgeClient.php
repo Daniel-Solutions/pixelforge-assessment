@@ -96,10 +96,21 @@ class PixelforgeClient
         return array_map(UsageDay::fromArray(...), $days);
     }
 
+    /**
+     * @throws PixelforgeException when no API key is configured (a deploy mistake, not a user error)
+     */
     private function request(): PendingRequest
     {
+        $apiKey = config('pixelforge.api_key');
+
+        if (! is_string($apiKey) || $apiKey === '') {
+            Log::critical('pixelforge.api_key_missing');
+
+            throw new PixelforgeException(PixelforgeErrorCode::InvalidApiKey, 'PIXELFORGE_API_KEY is not set.');
+        }
+
         return Http::baseUrl($this->baseUrl())
-            ->withToken(config()->string('pixelforge.api_key'))
+            ->withToken($apiKey)
             ->acceptJson()
             ->asJson()
             ->timeout(config()->integer('pixelforge.timeout'));

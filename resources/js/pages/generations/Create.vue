@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { Plus, X } from '@lucide/vue';
 import { computed } from 'vue';
 import InputError from '@/components/InputError.vue';
@@ -7,7 +7,8 @@ import FieldLabel from '@/components/studio/FieldLabel.vue';
 import SegmentedControl from '@/components/studio/SegmentedControl.vue';
 import TokenTable from '@/components/studio/TokenTable.vue';
 import { characterCount, estimate } from '@/lib/estimate';
-import { formatUsd, toDecimalString } from '@/lib/money';
+import { formatUsd, parseUsd, toDecimalString } from '@/lib/money';
+import { index as credits } from '@/routes/credits';
 import { store } from '@/routes/generations';
 import type { Option, Pricing, Quality, Size } from '@/types';
 
@@ -41,9 +42,21 @@ const liveEstimate = computed(() =>
           ),
 );
 
+const availableBalance = computed(() =>
+    parseUsd(usePage().props.auth.user.available_balance.exact),
+);
+
+/** The most this generation can cost must fit in the available balance (the server checks again). */
+const notEnoughCredits = computed(
+    () =>
+        liveEstimate.value !== null &&
+        availableBalance.value < liveEstimate.value.maxPrice,
+);
+
 const canSubmit = computed(
     () =>
         form.prompt.trim() !== '' &&
+        !notEnoughCredits.value &&
         characters.value <= props.limits.promptCharacters &&
         !form.processing,
 );
@@ -163,6 +176,24 @@ function submit(): void {
                     />
                 </div>
             </div>
+
+            <div
+                v-if="notEnoughCredits && liveEstimate"
+                class="mx-5 mb-3 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-sm"
+                role="status"
+            >
+                Not enough credits: this generation can cost up to
+                {{ formatUsd(liveEstimate.maxPrice) }}.
+                <Link :href="credits()" class="font-semibold underline"
+                    >Buy credits</Link
+                >
+            </div>
+            <InputError
+                class="mx-5 mb-3"
+                :message="
+                    (form.errors as Record<string, string | undefined>).credits
+                "
+            />
 
             <div
                 class="sticky bottom-0 mt-auto flex items-center justify-between gap-3 border-t border-border bg-card/90 px-5 py-2.5 backdrop-blur"

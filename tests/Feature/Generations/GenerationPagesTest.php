@@ -40,7 +40,7 @@ it('sends guests to the login page', function (string $route): void {
 it('shows the generate form with pricing for the live estimate', function (): void {
     fakePricing();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->get(route('generations.create'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
@@ -56,7 +56,7 @@ it('shows the generate form with pricing for the live estimate', function (): vo
 it('still shows the form when pricing is unavailable', function (): void {
     Http::fake(['pixelforge.test/v1/pricing' => Http::response(pixelforgeError('overloaded'), 503)]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->get(route('generations.create'))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('pricing', null));
@@ -65,7 +65,7 @@ it('still shows the form when pricing is unavailable', function (): void {
 it('submits a generation and redirects to the history', function (): void {
     fakePricing();
 
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
 
     $this->actingAs($user)
         ->post(route('generations.store'), validGenerationForm())
@@ -82,8 +82,8 @@ it('submits a generation and redirects to the history', function (): void {
 it('ignores fields the user must never set', function (): void {
     fakePricing();
 
-    $user = User::factory()->create();
-    $other = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
+    $other = User::factory()->withCredit()->create();
 
     $this->actingAs($user)->post(route('generations.store'), validGenerationForm([
         'user_id' => $other->id,
@@ -106,7 +106,7 @@ it('ignores fields the user must never set', function (): void {
 it('validates input exactly like Pixelforge does', function (array $form, string $error): void {
     fakePricing();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->post(route('generations.store'), validGenerationForm($form))
         ->assertSessionHasErrors($error);
 
@@ -124,7 +124,7 @@ it('validates input exactly like Pixelforge does', function (array $form, string
 it('accepts a prompt of exactly 4000 multibyte characters', function (): void {
     fakePricing();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->post(route('generations.store'), validGenerationForm(['prompt' => str_repeat('é', 4000)]))
         ->assertSessionHasNoErrors();
 });
@@ -132,7 +132,7 @@ it('accepts a prompt of exactly 4000 multibyte characters', function (): void {
 it('tells the user when pricing is down instead of submitting', function (): void {
     Http::fake(['pixelforge.test/v1/pricing' => Http::response(pixelforgeError('overloaded'), 503)]);
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->from(route('generations.create'))
         ->post(route('generations.store'), validGenerationForm())
         ->assertRedirect(route('generations.create'));
@@ -141,7 +141,7 @@ it('tells the user when pricing is down instead of submitting', function (): voi
 });
 
 it('lists only the user\'s own generations, newest first, and polls while one is pending', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     $older = Generation::factory()->for($user)->succeeded()->create();
     $newer = Generation::factory()->for($user)->processing()->create();
     Generation::factory()->create();
@@ -161,7 +161,7 @@ it('lists only the user\'s own generations, newest first, and polls while one is
 });
 
 it('stops polling when every generation is final', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     Generation::factory()->for($user)->succeeded()->create();
     Generation::factory()->for($user)->failed()->create();
 
@@ -171,7 +171,7 @@ it('stops polling when every generation is final', function (): void {
 });
 
 it('explains a failure in plain words and offers a retry', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     $generation = Generation::factory()->for($user)->failed()->create();
 
     $this->actingAs($user)
@@ -186,7 +186,7 @@ it('explains a failure in plain words and offers a retry', function (): void {
 });
 
 it('says when a generation is waiting for a free slot', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     $generation = Generation::factory()->for($user)->create(['last_submit_error' => 'concurrency_limit_exceeded']);
 
     $this->actingAs($user)
@@ -195,7 +195,7 @@ it('says when a generation is waiting for a free slot', function (): void {
 });
 
 it('hides an expired image', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     $generation = Generation::factory()->for($user)->succeeded()->create(['image_url_expires_at' => now()->subMinute()]);
 
     $this->actingAs($user)
@@ -208,7 +208,7 @@ it('hides an expired image', function (): void {
 it('does not show another user\'s generation', function (): void {
     $generation = Generation::factory()->succeeded()->create();
 
-    $this->actingAs(User::factory()->create())
+    $this->actingAs(User::factory()->withCredit()->create())
         ->get(route('generations.show', $generation))
         ->assertForbidden();
 });
@@ -216,7 +216,7 @@ it('does not show another user\'s generation', function (): void {
 it('retries a failed generation as a new one with a new idempotency key', function (): void {
     fakePricing();
 
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
     $failed = Generation::factory()->for($user)->failed()->create();
 
     $this->actingAs($user)
@@ -230,7 +230,7 @@ it('retries a failed generation as a new one with a new idempotency key', functi
 });
 
 it('does not retry someone else\'s or a successful generation', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->withCredit()->create();
 
     $this->actingAs($user)->post(route('generations.retry', Generation::factory()->failed()->create()))->assertForbidden();
     $this->actingAs($user)->post(route('generations.retry', Generation::factory()->for($user)->succeeded()->create()))->assertForbidden();

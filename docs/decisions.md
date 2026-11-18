@@ -96,3 +96,17 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Database driver for queue, cache and sessions.** One less service than Redis, and the load is a handful of jobs per minute.
 
 **Auth routes throttled.** The app is public: Fortify routes are limited to 30 requests per minute per IP (plus Fortify's own login limiter), generation submits to 10 per minute per user.
+
+## Stretch: admin report
+
+**Same day rule as Pixelforge.** `/admin/report` (gate `view-admin-report`, `is_admin` only, set by seeder) groups by `DATE(completed_at)` in UTC and by user: succeeded and failed counts, credit spent (`SUM(charged_amount)`), provider cost (`SUM(provider_cost)`) and profit (always charged − cost from the two stored sums). Totals per day, per user and overall; default range is the last 30 days. Each day shows "Pixelforge reported" from `/v1/usage` (cached 60 s) with ✓ or the exact difference; if Pixelforge cannot answer (error, or more than 92 days), our numbers still show and the column is empty. The aggregate query runs through `toBase()` so the aliases are not cast to `Nanodollars` by the model.
+
+## Stretch: balance
+
+**The ledger is the truth, `users.balance` is a cache.** Every purchase (positive) and charge (negative) is a `ledger_entries` row; `RecordLedgerEntry` updates `users.balance` in the same transaction with the user row locked. A test checks `SUM(amount) = balance`.
+
+**Available balance reserves the maximum.** Available = balance − Σ `estimated_max` of the user's unfinished generations. `SubmitGeneration` locks the user row and refuses (`InsufficientCredits`) when available < the new generation's `estimated_max`, so two simultaneous submits are serialized and cannot both spend the same credit (the lock is real on MySQL; SQLite serializes writes). On success the real `charged_amount` (always ≤ the maximum) is charged; on failure nothing is charged and the reservation disappears because the generation is final. The Generate button is disabled with "Not enough credits: this generation can cost up to $X. Buy credits", and the server checks again. Rejected: a separate "hold" ledger entry (two more writes per generation and a release step that can be forgotten).
+
+**Fake purchases, idempotent.** Fixed packages ($5, $10, $25). The page sends a one-time `purchase_token` (a UUID made in the browser); the action checks it and `purchase_token` is unique in the database, so a double click buys once. New users (registration and seeded accounts) get a $1 welcome credit as a `purchase` entry with token `welcome-{id}`.
+
+**A missing API key is a typed error.** Found while testing the report locally: with `PIXELFORGE_API_KEY` unset, the client now throws `PixelforgeException(invalid_api_key)` (logged as critical) instead of a config exception, so every caller's error handling applies.
