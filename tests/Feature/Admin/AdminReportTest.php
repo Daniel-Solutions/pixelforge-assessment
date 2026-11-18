@@ -112,3 +112,16 @@ it('is only for admins', function (): void {
     $this->post(route('logout'));
     $this->get(route('admin.report'))->assertRedirect(route('login'));
 });
+
+it('serves the report again from the database cache without breaking', function (): void {
+    config(['cache.default' => 'database']);
+    fakeUsage([['date' => '2026-11-01', 'cost' => '0.611020000']]);
+    $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)->get(route('admin.report', ['from' => '2026-11-01', 'to' => '2026-11-02']))->assertOk();
+    $this->actingAs($admin)->get(route('admin.report', ['from' => '2026-11-01', 'to' => '2026-11-02']))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('report.days.1.pixelforge_cost.exact', '0.611020000'));
+
+    Http::assertSentCount(1);
+});

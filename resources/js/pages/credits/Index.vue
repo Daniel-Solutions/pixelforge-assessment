@@ -7,7 +7,8 @@ import { store } from '@/routes/credits';
 import { show } from '@/routes/generations';
 import type { Money } from '@/types';
 
-defineProps<{
+const props = defineProps<{
+    purchaseToken: string;
     packages: { value: number; amount: Money }[];
     entries: {
         id: number;
@@ -20,15 +21,15 @@ defineProps<{
 
 const user = computed(() => usePage().props.auth.user);
 
-/** One token per page view: a double click or a resubmitted form buys only once. */
-const form = useForm({ package: 0, purchase_token: crypto.randomUUID() });
+/** The server issues one token per page view: a double click or a resubmitted form buys only once. */
+const form = useForm({ package: 0, purchase_token: props.purchaseToken });
 
 function buy(packageValue: number): void {
     form.package = packageValue;
     form.submit(store(), {
         preserveScroll: true,
-        onSuccess: () => {
-            form.purchase_token = crypto.randomUUID();
+        onSuccess: (page) => {
+            form.purchase_token = String(page.props.purchaseToken);
         },
     });
 }

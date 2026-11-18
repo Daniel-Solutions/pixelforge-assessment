@@ -75,9 +75,9 @@ class BuildAdminReport
                 return [
                     'date' => $date,
                     'total' => $sums->toArray(),
-                    'pixelforge_cost' => $reported?->pixelforgeCost->forDisplay(9),
-                    'matches' => $reported === null ? null : $reported->pixelforgeCost->amount === $sums->providerCost->amount,
-                    'difference' => $reported === null ? null : $sums->providerCost->subtract($reported->pixelforgeCost)->forDisplay(9),
+                    'pixelforge_cost' => $reported?->forDisplay(9),
+                    'matches' => $reported === null ? null : $reported->amount === $sums->providerCost->amount,
+                    'difference' => $reported === null ? null : $sums->providerCost->subtract($reported)->forDisplay(9),
                     'users' => $day['users'],
                 ];
             }, array_keys($days), $days),
@@ -93,26 +93,26 @@ class BuildAdminReport
     }
 
     /**
-     * @return array<string, UsageComparison>|null null when Pixelforge cannot be asked (error, or range over 92 days)
+     * Pixelforge's cost per day, in nanodollars. Cached as plain integers: the cache store does not
+     * unserialize objects (config/cache.php has serializable_classes => false).
+     *
+     * @return array<string, Nanodollars>|null null when Pixelforge cannot be asked (error, or range over 92 days)
      */
     private function pixelforgeByDay(CarbonImmutable $from, CarbonImmutable $to): ?array
     {
         try {
-            $comparisons = Cache::remember(
+            /** @var array<string, int> $costs */
+            $costs = Cache::remember(
                 "pixelforge.usage.{$from->toDateString()}.{$to->toDateString()}",
                 self::USAGE_CACHE_SECONDS,
-                fn (): array => $this->compareUsageWithPixelforge->handle($from, $to),
+                fn (): array => collect($this->compareUsageWithPixelforge->handle($from, $to))
+                    ->mapWithKeys(fn (UsageComparison $day): array => [$day->date => $day->pixelforgeCost->amount])
+                    ->all(),
             );
         } catch (PixelforgeException) {
             return null;
         }
 
-        $byDay = [];
-
-        foreach ($comparisons as $comparison) {
-            $byDay[$comparison->date] = $comparison;
-        }
-
-        return $byDay;
+        return array_map(Nanodollars::of(...), $costs);
     }
 }

@@ -52,6 +52,12 @@ class ProfileController extends Controller
     {
         $user = $request->user();
 
+        // Generations are billing records (Pixelforge billed them); deleting the user would cascade them away
+        // and break the admin report and the usage reconciliation.
+        if ($user->generations()->exists()) {
+            return back()->withErrors(['password' => 'Accounts with generation history cannot be deleted, because their billing records must be kept.']);
+        }
+
         Auth::logout();
 
         $user->delete();

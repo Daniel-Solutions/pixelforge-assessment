@@ -111,6 +111,21 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 
 **A missing API key is a typed error.** Found while testing the report locally: with `PIXELFORGE_API_KEY` unset, the client now throws `PixelforgeException(invalid_api_key)` (logged as critical) instead of a config exception, so every caller's error handling applies.
 
+## Code review fixes
+
+A review of the whole diff found ten issues; all were fixed with tests:
+
+- **Billed after local failure, any event order.** The rule now keys on "failed locally (not with Pixelforge's own `generation_failed`/`internal_error`), no provider cost yet", so a `processing` event that links the row first no longer hides the later `succeeded`.
+- **Stored rates win.** Cost uses the rates saved at creation; the payload's rates are used only if none were stored.
+- **Usage above the estimate.** Pixelforge's documented ranges keep usage inside the estimate. If it ever reports more, we still charge the real price (cost + 25%) but log `generation.charged_above_estimate`; capping would break "price = cost + 25%". The Credits page no longer promises "never more than the maximum".
+- **Admin report cache.** The cache store does not unserialize objects (`serializable_classes => false`), so the report caches plain integers per day; a second load used to 500.
+- **Purchase token from the server.** `crypto.randomUUID()` does not exist on plain-HTTP origins (`http://pixelforge.test`); the server now issues the token per page view.
+- **Backoff for unexpected errors** in the send job (`[5, 15, 30, 60]` s), so a bug cannot burn the shared 60 requests/minute.
+- **Reconciliation rotates** (least recently checked first, each poll touches the row) and survives any exception per row, so stuck rows cannot starve newer ones.
+- **Missing webhook secret** returns the documented 400 instead of a 500.
+- **Usage comparison covers both sides' days**, so a cost we recorded on a day Pixelforge did not report is flagged.
+- **Accounts with generations cannot be deleted**: the cascade would erase billing records that Pixelforge still counts.
+
 ## Verified against the real API
 
 The full QA script ran locally against Pixelforge with a local key and webhooks through an ngrok tunnel (`docs/qa.md`, run 1): every keyword scenario behaved as designed, `[duplicate]` deliveries were absorbed, the concurrency wait showed and resolved, a dashboard resend was a no-op, and `pixelforge:reconcile-usage` matched `/v1/usage` to `0.000000000`.
@@ -123,4 +138,4 @@ The full QA script ran locally against Pixelforge with a local key and webhooks 
 - **Two-factor auth, passkeys, email verification.** Removed from the starter kit: not part of the assessment, and fewer moving parts on a public URL.
 - **Refunds and admin balance adjustments.** The ledger supports new entry types, but no screen creates them.
 - **Per-user rate limiting beyond 10 submits/minute and the credit check.** Pixelforge's limits are per account, shared by all users; a fair-share queue would matter with many users, not for this evaluation.
-- **Browser tests.** By request; the proof is Pest (234 tests, MySQL and SQLite), Vitest, and the manual QA run in `docs/qa.md`.
+- **Browser tests.** By request; the proof is Pest (244 tests, MySQL and SQLite), Vitest, and the manual QA run in `docs/qa.md`.

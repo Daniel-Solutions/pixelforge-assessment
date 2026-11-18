@@ -35,12 +35,22 @@ class CompareUsageWithPixelforge
             ->keyBy('day');
 
         $comparisons = [];
+        $pixelforgeDays = [];
 
         foreach ($this->pixelforge->getUsage($from, $to) as $day) {
-            $row = $ours->get($day->date);
+            $pixelforgeDays[$day->date] = $day;
+        }
+
+        // Every day either side knows about: a cost we recorded on a day Pixelforge did not report is a mismatch too.
+        $dates = array_unique([...array_keys($pixelforgeDays), ...$ours->keys()->map(fn (mixed $date): string => (string) $date)->all()]);
+        sort($dates);
+
+        foreach ($dates as $date) {
+            $row = $ours->get($date);
+            $day = $pixelforgeDays[$date] ?? null;
 
             $comparisons[] = new UsageComparison(
-                date: $day->date,
+                date: $date,
                 ourGenerations: (int) ($row->generations ?? 0),
                 ourTokens: new TokenUsage(
                     inputText: (int) ($row->input_text ?? 0),
@@ -49,9 +59,9 @@ class CompareUsageWithPixelforge
                     reasoning: (int) ($row->reasoning ?? 0),
                 ),
                 ourCost: Nanodollars::of((int) ($row->cost ?? 0)),
-                pixelforgeGenerations: $day->generations,
-                pixelforgeTokens: $day->tokens,
-                pixelforgeCost: $day->cost,
+                pixelforgeGenerations: $day->generations ?? 0,
+                pixelforgeTokens: $day->tokens ?? new TokenUsage(0, 0, 0, 0),
+                pixelforgeCost: $day->cost ?? Nanodollars::zero(),
             );
         }
 

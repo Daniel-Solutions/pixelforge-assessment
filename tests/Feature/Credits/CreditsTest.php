@@ -156,3 +156,23 @@ it('seeds the configured accounts once, with their welcome credit', function ():
         ->and(User::query()->where('email', 'demo@example.com')->sole()->is_admin)->toBeFalse()
         ->and(LedgerEntry::query()->count())->toBe(2);
 });
+
+it('issues a fresh purchase token from the server on every page view', function (): void {
+    $user = User::factory()->create();
+
+    $first = $this->actingAs($user)->get(route('credits.index'))->inertiaProps('purchaseToken');
+    $second = $this->actingAs($user)->get(route('credits.index'))->inertiaProps('purchaseToken');
+
+    expect(Str::isUuid($first))->toBeTrue()->and($first)->not->toBe($second);
+});
+
+it('keeps the billing records of a user who has generations', function (): void {
+    $user = User::factory()->create();
+    Generation::factory()->for($user)->succeeded()->create();
+
+    $this->actingAs($user)
+        ->delete(route('profile.destroy'), ['password' => 'password'])
+        ->assertSessionHasErrors('password');
+
+    expect($user->fresh())->not->toBeNull();
+});

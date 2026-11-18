@@ -11,6 +11,7 @@ use App\Models\LedgerEntry;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -21,6 +22,8 @@ class CreditsController extends Controller
     public function index(Request $request): Response
     {
         return Inertia::render('credits/Index', [
+            // One token per page view: a double click or a resubmitted form buys only once.
+            'purchaseToken' => (string) Str::uuid(),
             'packages' => array_map(fn (CreditPackage $package): array => [
                 'value' => $package->value,
                 'amount' => $package->amount()->forDisplay(2),

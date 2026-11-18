@@ -67,3 +67,12 @@ it('reports a range Pixelforge refuses', function (): void {
         ->expectsOutputToContain('date_range_too_long')
         ->assertFailed();
 });
+
+it('flags a day where we recorded cost but Pixelforge reported none', function (): void {
+    Http::fake(['pixelforge.test/v1/usage*' => Http::response(['object' => 'usage', 'data' => []])]);
+
+    $this->artisan('pixelforge:reconcile-usage', ['--from' => '2026-11-01', '--to' => '2026-11-02'])
+        ->expectsOutputToContain('2026-11-01')
+        ->expectsOutputToContain('1 day(s) differ.')
+        ->assertFailed();
+});

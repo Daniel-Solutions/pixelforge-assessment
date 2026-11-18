@@ -154,3 +154,7 @@ it('does not fail a generation that Pixelforge accepted in the meantime', functi
     expect($generation->refresh()->status)->toBe(GenerationStatus::Processing)
         ->and($generation->failure_code)->toBeNull();
 });
+
+it('backs off after unexpected errors instead of retrying at once', function (): void {
+    expect((new SendGenerationToPixelforge(Generation::factory()->create()))->backoff)->toBe([5, 15, 30, 60]);
+});
