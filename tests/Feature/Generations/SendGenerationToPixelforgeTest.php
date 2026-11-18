@@ -29,7 +29,7 @@ it('sends the generation with its own idempotency key and metadata, then stores 
     $generation->refresh();
     expect($generation->pixelforge_id)->toBe('gen_new')
         ->and($generation->status)->toBe(GenerationStatus::Queued)
-        ->and($generation->rates)->toBe(['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'])
+        ->and($generation->rates)->toEqual(['input_text_tokens' => '5.00', 'input_image_tokens' => '10.00', 'output_tokens' => '40.00', 'reasoning_tokens' => '12.50'])
         ->and($generation->provider_created_at?->toIso8601ZuluString())->toBe('2026-11-04T14:03:11Z')
         ->and($generation->submit_attempts)->toBe(1);
 
@@ -144,4 +144,13 @@ it('gives up ten minutes after the generation was created', function (): void {
 
     expect((new SendGenerationToPixelforge($generation))->retryUntil()->getTimestamp())
         ->toBe($generation->created_at->addMinutes(10)->getTimestamp());
+});
+
+it('does not fail a generation that Pixelforge accepted in the meantime', function (): void {
+    $generation = Generation::factory()->processing()->create();
+
+    (new SendGenerationToPixelforge($generation))->failed(null);
+
+    expect($generation->refresh()->status)->toBe(GenerationStatus::Processing)
+        ->and($generation->failure_code)->toBeNull();
 });

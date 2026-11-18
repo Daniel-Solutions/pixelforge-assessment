@@ -1,0 +1,130 @@
+# Pixelforge Studio in production on the UbServer.
+# Two ways in, both ending at `web` (nginx) on port 80, and no service publishes a port on the host:
+#   - Traefik on the LAN: http://pixelforge.test (only `web` joins the Traefik network);
+#   - the `tailscale` sidecar with Funnel: https://pixelforge.<tailnet>.ts.net, public on the internet,
+#     because PromptEdit opens the URL and Pixelforge delivers webhooks to it.
+# Published by the server's `deploy` command, which sets the project name and the .env. See docs/deploy.md.
+
+x-logging: &logging
+    driver: json-file
+    options:
+        max-size: '10m'
+        max-file: '3'
+
+x-app: &app
+    build:
+        context: .
+        dockerfile: docker/php/Dockerfile.prod
+        target: app
+        args:
+            UID: ${UID:-1000}
+            GID: ${GID:-1000}
+    image: pixelforge-prod-app
+    env_file: .env
+    restart: unless-stopped
+    depends_on:
+        mysql:
+            condition: service_healthy
+    logging: *logging
+
+services:
+    app:
+        <<: *app
+        # Config, route and view caches built with the container's real environment.
+        command: sh -c "php artisan config:cache && php artisan route:cache && php artisan view:cache && exec php-fpm"
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'php -r ''exit(@fsockopen("127.0.0.1", 9000) ? 0 : 1);''',
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 10
+
+    web:
+        build:
+            context: .
+            dockerfile: docker/php/Dockerfile.prod
+            target: web
+            args:
+                UID: ${UID:-1000}
+                GID: ${GID:-1000}
+        image: pixelforge-prod-web
+        restart: unless-stopped
+        depends_on:
+            app:
+                condition: service_healthy
+        networks:
+            - default
+            - traefik
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=${TRAEFIK_NETWORK:?set TRAEFIK_NETWORK in .env}
+            - traefik.http.routers.pixelforge.rule=Host(`${APP_HOST:-pixelforge.test}`)
+            - traefik.http.routers.pixelforge.entrypoints=${TRAEFIK_ENTRYPOINT:?set TRAEFIK_ENTRYPOINT in .env}
+            - traefik.http.services.pixelforge.loadbalancer.server.port=80
+        logging: *logging
+
+    # Its own machine "pixelforge" on the tailnet. Funnel publishes https://pixelforge.<tailnet>.ts.net -> web:80
+    # to the internet (docker/tailscale/serve.json: Funnel on 443 only, proxying only to `web`, never to Traefik).
+    # The auth key comes from shared/.env (TS_AUTHKEY) and is used only on the first login.
+    tailscale:
+        image: tailscale/tailscale:v1.104.4
+        hostname: pixelforge
+        environment:
+            TS_AUTHKEY: ${TS_AUTHKEY:-}
+            TS_HOSTNAME: pixelforge
+            TS_STATE_DIR: /var/lib/tailscale
+            TS_USERSPACE: 'true'
+            TS_SERVE_CONFIG: /config/serve.json
+        volumes:
+            - tailscale-state:/var/lib/tailscale
+            - ./docker/tailscale/serve.json:/config/serve.json:ro
+        depends_on:
+            - web
+        restart: unless-stopped
+        logging: *logging
+
+    # Sends generations to Pixelforge and retries them. Retries are bounded by each job's retryUntil().
+    queue:
+        <<: *app
+        command: php artisan queue:work --sleep=1 --max-time=3600
+
+    # Every minute: reconcile generations whose webhook did not arrive.
+    scheduler:
+        <<: *app
+        command: php artisan schedule:work
+
+    mysql:
+        image: mysql:8.4
+        command: --performance-schema=OFF --innodb-buffer-pool-size=256M
+        environment:
+            MYSQL_DATABASE: ${DB_DATABASE:?}
+            MYSQL_USER: ${DB_USERNAME:?}
+            MYSQL_PASSWORD: ${DB_PASSWORD:?}
+            MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?}
+            TZ: UTC
+        volumes:
+            - mysql-data:/var/lib/mysql
+        healthcheck:
+            test:
+                [
+                    'CMD-SHELL',
+                    'mysqladmin ping -h localhost -p"$$MYSQL_ROOT_PASSWORD"',
+                ]
+            interval: 5s
+            timeout: 5s
+            retries: 20
+        restart: unless-stopped
+        logging: *logging
+
+networks:
+    # The server's Traefik network, created by it. Only `web` joins it.
+    traefik:
+        name: ${TRAEFIK_NETWORK:?set TRAEFIK_NETWORK in .env}
+        external: true
+
+volumes:
+    mysql-data:
+    tailscale-state:

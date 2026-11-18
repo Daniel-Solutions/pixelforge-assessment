@@ -84,3 +84,15 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Retry creates a new generation.** A failed generation stays failed; "Retry" submits the same input as a new row with a new `Idempotency-Key` (reusing the old key would replay the old failure).
 
 **Estimated tokens are stored.** `estimated_tokens` keeps the min/max token counts used for the stored estimate, so the detail page compares estimate and actual even if Pixelforge's tables change later.
+
+## Deploy
+
+**UbServer + Tailscale Funnel, same pattern as 247squad.** Compose services `app`, `web`, `queue`, `scheduler`, `mysql` and a `tailscale` sidecar; no published ports. The difference from 247squad: the app must be public (PromptEdit opens it, Pixelforge posts webhooks and refuses private addresses), so `serve.json` turns on Funnel for 443 only, proxying only to `web:80`. Rejected: ngrok/cloudflared (another moving part and account) and opening router ports.
+
+**The assets stage has PHP.** Wayfinder's Vite plugin runs `php artisan wayfinder:generate` during the build, so the `assets` stage is `php:8.4-cli-alpine` plus Node, instead of a Node image. Production still has no Node.
+
+**Larger FastCGI buffers.** Laravel's `Link` preload header lists every Vite chunk; nginx's 4k default buffer returned 502 on Inertia pages. Found by running the production stack locally before deploying.
+
+**Database driver for queue, cache and sessions.** One less service than Redis, and the load is a handful of jobs per minute.
+
+**Auth routes throttled.** The app is public: Fortify routes are limited to 30 requests per minute per IP (plus Fortify's own login limiter), generation submits to 10 per minute per user.

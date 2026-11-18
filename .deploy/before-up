@@ -1,0 +1,4 @@
+# One command per line, run with `docker compose run --rm app sh -c "<line>"` before the new containers start.
+php artisan migrate --force
+# Idempotent: creates the admin and demo accounts only if their passwords are set.
+php artisan db:seed --force

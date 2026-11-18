@@ -32,6 +32,9 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
 
         RateLimiter::for('generations', fn (Request $request): Limit => Limit::perMinute(10)->by((string) $request->user()?->getAuthIdentifier()));
+
+        // The app is public on the internet: every Fortify route (login, register, password reset) is throttled per IP.
+        RateLimiter::for('auth', fn (Request $request): Limit => Limit::perMinute(30)->by((string) $request->ip()));
     }
 
     /**

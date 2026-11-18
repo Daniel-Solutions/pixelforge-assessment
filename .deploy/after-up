@@ -1,0 +1,2 @@
+# Run inside the running app container after `up`. Workers pick up the new code.
+php artisan queue:restart

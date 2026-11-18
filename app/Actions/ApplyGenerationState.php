@@ -74,15 +74,15 @@ class ApplyGenerationState
         return $change;
     }
 
+    /**
+     * Only called when the remote status is ahead of ours, so it is processing, succeeded or failed (never queued).
+     */
     private function moveForward(Generation $generation, RemoteGeneration $remote): StateChange
     {
-        match ($remote->status) {
-            GenerationStatus::Processing => $generation->fill([
-                'status' => GenerationStatus::Processing,
-                'started_at' => $remote->startedAt,
-            ]),
-            GenerationStatus::Succeeded => $this->fillSucceeded($generation, $remote),
-            GenerationStatus::Failed => $generation->fill([
+        if ($remote->status === GenerationStatus::Succeeded) {
+            $this->fillSucceeded($generation, $remote);
+        } elseif ($remote->status === GenerationStatus::Failed) {
+            $generation->fill([
                 'status' => GenerationStatus::Failed,
                 'failure_code' => $remote->errorCode,
                 'failure_message' => (PixelforgeErrorCode::tryFrom((string) $remote->errorCode) ?? PixelforgeErrorCode::InternalError)->userMessage(),
@@ -90,9 +90,13 @@ class ApplyGenerationState
                 'charged_amount' => Nanodollars::zero(),
                 'started_at' => $generation->started_at ?? $remote->startedAt,
                 'completed_at' => $remote->completedAt ?? now(),
-            ]),
-            GenerationStatus::Queued => throw new LogicException('Queued is never ahead of a stored status.'),
-        };
+            ]);
+        } else {
+            $generation->fill([
+                'status' => GenerationStatus::Processing,
+                'started_at' => $remote->startedAt,
+            ]);
+        }
 
         return StateChange::Applied;
     }
