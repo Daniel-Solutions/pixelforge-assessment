@@ -110,3 +110,17 @@ The docs at https://pixelforge.promptedit.dev/docs were read on 2026-11-17. They
 **Fake purchases, idempotent.** Fixed packages ($5, $10, $25). The page sends a one-time `purchase_token` (a UUID made in the browser); the action checks it and `purchase_token` is unique in the database, so a double click buys once. New users (registration and seeded accounts) get a $1 welcome credit as a `purchase` entry with token `welcome-{id}`.
 
 **A missing API key is a typed error.** Found while testing the report locally: with `PIXELFORGE_API_KEY` unset, the client now throws `PixelforgeException(invalid_api_key)` (logged as critical) instead of a config exception, so every caller's error handling applies.
+
+## Verified against the real API
+
+The full QA script ran locally against Pixelforge with a local key and webhooks through an ngrok tunnel (`docs/qa.md`, run 1): every keyword scenario behaved as designed, `[duplicate]` deliveries were absorbed, the concurrency wait showed and resolved, a dashboard resend was a no-op, and `pixelforge:reconcile-usage` matched `/v1/usage` to `0.000000000`.
+
+## Left out and why
+
+- **Storing images.** Pixelforge keeps images for 24 hours; after `image_url_expires_at` the UI shows "Image expired" instead of a broken image. Storing them (S3 or disk) was not asked and adds storage, cleanup and cost.
+- **Real payments.** "Buy credits" is a test purchase that writes a ledger entry. A payment provider (Stripe Checkout + webhook) would reuse the same idempotent `BuyCredits` path.
+- **Websockets for live status.** 3-second Inertia polling, only while something is pending, is enough here and needs no extra service.
+- **Two-factor auth, passkeys, email verification.** Removed from the starter kit: not part of the assessment, and fewer moving parts on a public URL.
+- **Refunds and admin balance adjustments.** The ledger supports new entry types, but no screen creates them.
+- **Per-user rate limiting beyond 10 submits/minute and the credit check.** Pixelforge's limits are per account, shared by all users; a fair-share queue would matter with many users, not for this evaluation.
+- **Browser tests.** By request; the proof is Pest (234 tests, MySQL and SQLite), Vitest, and the manual QA run in `docs/qa.md`.
