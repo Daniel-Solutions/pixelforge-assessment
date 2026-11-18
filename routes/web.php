@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\AdminReportController;
 use App\Http\Controllers\GenerationController;
 use App\Http\Controllers\RetryGenerationController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,8 @@ Route::middleware('auth')->group(function () {
     Route::get('generations', [GenerationController::class, 'index'])->name('generations.index');
     Route::get('generations/{generation}', [GenerationController::class, 'show'])->name('generations.show');
     Route::post('generations/{generation}/retry', RetryGenerationController::class)->middleware('throttle:generations')->name('generations.retry');
+
+    Route::get('admin/report', AdminReportController::class)->name('admin.report');
 });
 
 require __DIR__.'/settings.php';

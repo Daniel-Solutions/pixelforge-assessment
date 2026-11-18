@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Link, usePage } from '@inertiajs/vue3';
-import { History, Menu, Sparkles } from '@lucide/vue';
+import { ChartColumn, History, Menu, Sparkles } from '@lucide/vue';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/sheet';
 import UserMenuContent from '@/components/UserMenuContent.vue';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { report } from '@/routes/admin';
 import { create, index } from '@/routes/generations';
 import type { BreadcrumbItem, NavItem } from '@/types';
 
@@ -29,6 +30,9 @@ const { isCurrentUrl } = useCurrentUrl();
 const navItems = computed<NavItem[]>(() => [
     { title: 'Generate', href: create(), icon: Sparkles },
     { title: 'History', href: index(), icon: History },
+    ...(user.value.is_admin
+        ? [{ title: 'Report', href: report(), icon: ChartColumn }]
+        : []),
 ]);
 </script>
 
